@@ -49,17 +49,36 @@ const player = new THREE.Mesh(playerGeometry, playerMaterial);
 
 const otherPlayers = {};
 
-// Handle new player joining
-socket.on("playerJoined", ({ id, position }) => {
-    if (id !== socket.id) {
-        const playerMaterial = new THREE.MeshStandardMaterial({ color: 0x8000ff });
-        const playerGeometry = new THREE.BoxGeometry(0.5, 1, 0.5);
-        const otherPlayer = new THREE.Mesh(playerGeometry, playerMaterial);
 
-        otherPlayer.position.set(position.x, position.y, position.z);
-        scene.add(otherPlayer);
-        otherPlayers[id] = otherPlayer;
+// Handle new player joining
+socket.on("playerJoined", ({ client_id, player_position, serverPlayers }) => {
+    console.log("a new client has joined. your status is:")
+    // All clients that are not the new joinee must render the new joinee
+    if (client_id !== socket.id) {
+        console.log("you are a client that is witnessing a new join");
+        const playerMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const playerGeometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+        const new_player = new THREE.Mesh(playerGeometry, playerMaterial);
+
+        new_player.position.set(player_position.x, player_position.y, player_position.z);
+        scene.add(new_player);
+        otherPlayers[client_id] = new_player;
     }
+    // New joinee must render all preexisting clients
+    if (client_id === socket.id) {
+        console.log("you are the client who just joined");
+        for (const player_id in serverPlayers) {
+            if (player_id !== socket.id && !otherPlayers[player_id]) {
+                const playerMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+                const playerGeometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+                const otherPlayer = new THREE.Mesh(playerGeometry, playerMaterial);
+
+                otherPlayer.position.set(serverPlayers[player_id].x, serverPlayers[player_id].y, serverPlayers[player_id].z);
+                scene.add(otherPlayer);
+                otherPlayers[player_id] = otherPlayer;
+            }
+        }
+    };
 });
 
 // Handle player leaving
@@ -77,20 +96,7 @@ socket.on("positionUpdate", ({ id, position }) => {
     }
 });
 
-// Initialize players
-socket.on("initializePlayers", (serverPlayers) => {
-    for (const id in serverPlayers) {
-        if (id !== socket.id && !otherPlayers[id]) {
-            const playerMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-            const playerGeometry = new THREE.BoxGeometry(0.5, 1, 0.5);
-            const otherPlayer = new THREE.Mesh(playerGeometry, playerMaterial);
 
-            otherPlayer.position.set(serverPlayers[id].x, serverPlayers[id].y, serverPlayers[id].z);
-            scene.add(otherPlayer);
-            otherPlayers[id] = otherPlayer;
-        }
-    }
-});
 
 
 // Movement
@@ -101,14 +107,24 @@ let right = false;
 let onGround = true;
 let playerHeight = 2;
 let velocityY = 0;
+let isCar = false;
 
 function handleKeyPress(key, state) {
     if (key === "w") forward = state;
     if (key === "s") backward = state;
     if (key === "a") left = state;
     if (key === "d") right = state;
-    if (key === " " && onGround) { velocityY = jumpStrength; camera.position.y += velocityY }
-    if (key === "shift") { playerHeight = state ? 1 : 2; camera.position.y -= 1 }
+    if (key === " " && onGround) { velocityY = jumpStrength; camera.position.y += velocityY };
+    if (key === "shift") { playerHeight = state ? 1 : 2; camera.position.y -= 1 };
+    if (key === "p") {
+        if (state) { isCar = !isCar };
+        if (isCar) {
+            player.scale.set(4, 1, 2);
+        }
+        else {
+            player.scale.set(1, 1, 1);
+        };
+    };
 }
 
 function move() {
