@@ -18,13 +18,17 @@ app.get("/", (req, res) => {
 io.on("connection", (socket) => {
     console.log(`Player ${socket.id} joined`);
     players[socket.id] = { x: 0, y: 2, z: 0 };
-    socket.emit("initializePlayers", players);
-    socket.broadcast.emit("playerJoined", { id: socket.id, position: players[socket.id] });
+    // Send message to ALL clients that a new player has joined
+    io.emit("playerJoined", { client_id: socket.id, player_position: players[socket.id], serverPlayers: players });
 
     // Handle position updates
     socket.on("positionUpdate", ({ id, position }) => {
-        players[id] = position;
-        socket.broadcast.emit("positionUpdate", { id, position });
+        if (players[id]) { // Check if the player exists
+            players[id] = position;
+            socket.broadcast.emit("positionUpdate", { id, position });
+        } else {
+            console.warn(`Received position update for unknown player: ${id}`);
+        }
     });
 
     // Handle disconnection
